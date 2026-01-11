@@ -4,7 +4,7 @@
     {
       "type": 1,
       "title": "CMX - PostgreSQL",
-      "description": "PostgreSQL Datenbank (Basis für CMX OS Module, ERP/CRM, Keycloak etc.)",
+      "description": "PostgreSQL Datenbank (Basis für CMX OS Module, Odoo, Keycloak, Metabase etc.)",
       "categories": ["CMX Core", "Database"],
       "platform": "linux",
       "logo": "https://www.postgresql.org/media/img/about/press/elephant.png",
@@ -16,9 +16,23 @@
         { "name": "POSTGRES_USER", "label": "DB User", "default": "cmx" },
         { "name": "POSTGRES_PASSWORD", "label": "DB Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
       ],
-      "volumes": [
-        { "container": "/var/lib/postgresql/data", "bind": "/opt/cmx/postgres/data" }
-      ]
+      "volumes": [{ "container": "/var/lib/postgresql/data", "bind": "/opt/cmx/postgres/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - pgAdmin",
+      "description": "PostgreSQL Admin UI (DB Verwaltung im Browser).",
+      "categories": ["CMX Tools", "Database"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/pgadmin-org/pgadmin4/master/web/pgadmin/static/img/pgadmin_logo.png",
+      "image": "dpage/pgadmin4:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["5050:80"],
+      "env": [
+        { "name": "PGADMIN_DEFAULT_EMAIL", "label": "Admin Email", "default": "admin@cmx.local" },
+        { "name": "PGADMIN_DEFAULT_PASSWORD", "label": "Admin Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [{ "container": "/var/lib/pgadmin", "bind": "/opt/cmx/pgadmin/data" }]
     },
     {
       "type": 1,
@@ -31,8 +45,20 @@
       "restart_policy": "unless-stopped",
       "ports": ["6379:6379"],
       "command": "redis-server --appendonly yes",
-      "volumes": [
-        { "container": "/data", "bind": "/opt/cmx/redis/data" }
+      "volumes": [{ "container": "/data", "bind": "/opt/cmx/redis/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Redis Commander",
+      "description": "Redis UI im Browser.",
+      "categories": ["CMX Tools", "Cache"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/joeferner/redis-commander/master/web/static/logo.png",
+      "image": "rediscommander/redis-commander:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8087:8081"],
+      "env": [
+        { "name": "REDIS_HOSTS", "label": "Redis Hosts", "default": "local:host.docker.internal:6379" }
       ]
     },
     {
@@ -50,10 +76,222 @@
         { "name": "MINIO_ROOT_USER", "label": "MinIO Root User", "default": "cmxadmin" },
         { "name": "MINIO_ROOT_PASSWORD", "label": "MinIO Root Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
       ],
+      "volumes": [{ "container": "/data", "bind": "/opt/cmx/minio/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Adminer",
+      "description": "DB-Universal-UI (Postgres/MySQL/SQLite etc.).",
+      "categories": ["CMX Tools", "Database"],
+      "platform": "linux",
+      "logo": "https://www.adminer.org/static/images/adminer.png",
+      "image": "adminer:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8086:8080"]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Traefik (Reverse Proxy)",
+      "description": "Reverse Proxy / HTTPS / Routing (besser als NPM, wenn du Labels nutzt).",
+      "categories": ["CMX Core", "Networking"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/traefik/traefik/master/docs/content/assets/img/traefik.logo.png",
+      "image": "traefik:v3.1",
+      "restart_policy": "unless-stopped",
+      "ports": ["80:80", "443:443", "8080:8080"],
+      "command": "--api.insecure=true --providers.docker=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443",
       "volumes": [
-        { "container": "/data", "bind": "/opt/cmx/minio/data" }
+        { "container": "/var/run/docker.sock", "bind": "/var/run/docker.sock" }
       ]
     },
+    {
+      "type": 1,
+      "title": "CMX - Nginx Proxy Manager (GUI Proxy)",
+      "description": "Reverse Proxy mit GUI (einfach, schnell).",
+      "categories": ["CMX Core", "Networking"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/NginxProxyManager/nginx-proxy-manager/develop/frontend/src/assets/logo.png",
+      "image": "jc21/nginx-proxy-manager:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["80:80", "81:81", "443:443"],
+      "volumes": [
+        { "container": "/data", "bind": "/opt/cmx/npm/data" },
+        { "container": "/etc/letsencrypt", "bind": "/opt/cmx/npm/letsencrypt" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Caddy",
+      "description": "Ultra einfacher HTTPS Reverse Proxy (Caddyfile).",
+      "categories": ["CMX Core", "Networking"],
+      "platform": "linux",
+      "logo": "https://caddyserver.com/resources/images/caddy-logo.svg",
+      "image": "caddy:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["80:80", "443:443"],
+      "volumes": [
+        { "container": "/data", "bind": "/opt/cmx/caddy/data" },
+        { "container": "/config", "bind": "/opt/cmx/caddy/config" }
+      ]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Keycloak (SSO/IAM)",
+      "description": "Identity & Access Management (SSO, Roles, Groups) – perfekt für Workspaces.",
+      "categories": ["CMX Core", "Auth", "Security"],
+      "platform": "linux",
+      "logo": "https://www.keycloak.org/resources/images/keycloak_logo_200px.svg",
+      "image": "quay.io/keycloak/keycloak:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8081:8080"],
+      "command": "start-dev",
+      "env": [
+        { "name": "KC_HOSTNAME_STRICT", "label": "Hostname strict", "default": "false" },
+        { "name": "KEYCLOAK_ADMIN", "label": "Admin User", "default": "admin" },
+        { "name": "KEYCLOAK_ADMIN_PASSWORD", "label": "Admin Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [{ "container": "/opt/keycloak/data", "bind": "/opt/cmx/keycloak/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Authelia (2FA Gateway)",
+      "description": "2FA/SSO-Gateway (meist vor Traefik/Nginx).",
+      "categories": ["CMX Core", "Auth", "Security"],
+      "platform": "linux",
+      "logo": "https://www.authelia.com/images/logo.png",
+      "image": "authelia/authelia:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["9091:9091"],
+      "volumes": [{ "container": "/config", "bind": "/opt/cmx/authelia/config" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - CrowdSec",
+      "description": "Community-basierte Intrusion Prevention (Ban-Layer).",
+      "categories": ["CMX Core", "Security"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/crowdsecurity/crowdsec-docs/main/static/img/crowdsec_logo.png",
+      "image": "crowdsecurity/crowdsec:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8080:8080"],
+      "volumes": [
+        { "container": "/etc/crowdsec", "bind": "/opt/cmx/crowdsec/etc" },
+        { "container": "/var/lib/crowdsec/data", "bind": "/opt/cmx/crowdsec/data" },
+        { "container": "/var/log", "bind": "/var/log" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Vaultwarden",
+      "description": "Selfhosted Passwort-Manager (Bitwarden kompatibel).",
+      "categories": ["CMX Modules", "Security"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/dani-garcia/vaultwarden/main/resources/vaultwarden-icon.png",
+      "image": "vaultwarden/server:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8088:80"],
+      "env": [
+        { "name": "SIGNUPS_ALLOWED", "label": "Signups erlaubt", "default": "false" }
+      ],
+      "volumes": [{ "container": "/data", "bind": "/opt/cmx/vaultwarden/data" }]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Watchtower",
+      "description": "Auto-Update für Docker Images (vorsichtig nutzen!).",
+      "categories": ["CMX Ops", "Maintenance"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/containrrr/watchtower/main/logo.png",
+      "image": "containrrr/watchtower:latest",
+      "restart_policy": "unless-stopped",
+      "volumes": [{ "container": "/var/run/docker.sock", "bind": "/var/run/docker.sock" }],
+      "command": "--cleanup --interval 86400"
+    },
+    {
+      "type": 1,
+      "title": "CMX - Uptime Kuma",
+      "description": "Uptime Monitoring (Status checks für alle CMX Services).",
+      "categories": ["CMX Ops", "Monitoring"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/louislam/uptime-kuma/master/public/icon.svg",
+      "image": "louislam/uptime-kuma:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3001:3001"],
+      "volumes": [{ "container": "/app/data", "bind": "/opt/cmx/uptime-kuma/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Dozzle (Docker Logs UI)",
+      "description": "Live Container Logs im Browser.",
+      "categories": ["CMX Ops", "Logging"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/amir20/dozzle/master/assets/logo.png",
+      "image": "amir20/dozzle:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["9999:8080"],
+      "volumes": [{ "container": "/var/run/docker.sock", "bind": "/var/run/docker.sock" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Netdata",
+      "description": "Server Monitoring (CPU/RAM/Disk/Netz) in realtime.",
+      "categories": ["CMX Ops", "Monitoring"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/netdata/netdata/master/web/gui/v2/static/img/netdata-icon.svg",
+      "image": "netdata/netdata:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["19999:19999"],
+      "volumes": [
+        { "container": "/var/run/docker.sock", "bind": "/var/run/docker.sock" },
+        { "container": "/etc/netdata", "bind": "/opt/cmx/netdata/etc" },
+        { "container": "/var/lib/netdata", "bind": "/opt/cmx/netdata/lib" },
+        { "container": "/var/cache/netdata", "bind": "/opt/cmx/netdata/cache" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Prometheus",
+      "description": "Metrics Collector (Basis für Grafana).",
+      "categories": ["CMX Ops", "Monitoring"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/prometheus/prometheus/main/documentation/images/prometheus-logo.png",
+      "image": "prom/prometheus:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["9090:9090"],
+      "volumes": [{ "container": "/etc/prometheus", "bind": "/opt/cmx/prometheus/etc" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Grafana",
+      "description": "Dashboards für Metrics/Logs (Prometheus/Loki).",
+      "categories": ["CMX Ops", "Monitoring"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/grafana/grafana/main/public/img/grafana_icon.svg",
+      "image": "grafana/grafana:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3002:3000"],
+      "env": [
+        { "name": "GF_SECURITY_ADMIN_USER", "label": "Admin User", "default": "admin" },
+        { "name": "GF_SECURITY_ADMIN_PASSWORD", "label": "Admin Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [{ "container": "/var/lib/grafana", "bind": "/opt/cmx/grafana/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Loki (Logs)",
+      "description": "Log Storage (Grafana Loki).",
+      "categories": ["CMX Ops", "Logging"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/grafana/loki/main/docs/sources/logo.png",
+      "image": "grafana/loki:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3100:3100"],
+      "volumes": [{ "container": "/loki", "bind": "/opt/cmx/loki/data" }]
+    },
+
     {
       "type": 1,
       "title": "CMX - n8n Automation",
@@ -66,7 +304,6 @@
       "ports": ["5678:5678"],
       "env": [
         { "name": "N8N_HOST", "label": "Public Hostname (optional)", "default": "localhost" },
-        { "name": "N8N_PORT", "label": "Port", "default": "5678" },
         { "name": "N8N_PROTOCOL", "label": "Protocol (http/https)", "default": "http" },
         { "name": "WEBHOOK_URL", "label": "Webhook Base URL (optional)", "default": "http://localhost:5678" },
         { "name": "N8N_ENCRYPTION_KEY", "label": "Encryption Key (32+ chars)", "default": "REPLACE_WITH_32PLUS_RANDOM_CHARS" },
@@ -74,30 +311,9 @@
         { "name": "N8N_BASIC_AUTH_USER", "label": "Basic Auth User", "default": "admin" },
         { "name": "N8N_BASIC_AUTH_PASSWORD", "label": "Basic Auth Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
       ],
-      "volumes": [
-        { "container": "/home/node/.n8n", "bind": "/opt/cmx/n8n/data" }
-      ]
+      "volumes": [{ "container": "/home/node/.n8n", "bind": "/opt/cmx/n8n/data" }]
     },
-    {
-      "type": 1,
-      "title": "CMX - Keycloak (SSO/IAM)",
-      "description": "Identity & Access Management (SSO, Roles, Groups) – perfekt für Workspaces.",
-      "categories": ["CMX Core", "Auth"],
-      "platform": "linux",
-      "logo": "https://www.keycloak.org/resources/images/keycloak_logo_200px.svg",
-      "image": "quay.io/keycloak/keycloak:latest",
-      "restart_policy": "unless-stopped",
-      "ports": ["8081:8080"],
-      "command": "start-dev",
-      "env": [
-        { "name": "KC_HOSTNAME_STRICT", "label": "Hostname strict", "default": "false" },
-        { "name": "KEYCLOAK_ADMIN", "label": "Admin User", "default": "admin" },
-        { "name": "KEYCLOAK_ADMIN_PASSWORD", "label": "Admin Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
-      ],
-      "volumes": [
-        { "container": "/opt/keycloak/data", "bind": "/opt/cmx/keycloak/data" }
-      ]
-    },
+
     {
       "type": 1,
       "title": "CMX - OnlyOffice Document Server",
@@ -119,6 +335,63 @@
     },
     {
       "type": 1,
+      "title": "CMX - Nextcloud",
+      "description": "Files/Collaboration (als CMX Files/Drive Modul nutzbar). Hinweis: für Produktion DB empfohlen.",
+      "categories": ["CMX Modules", "Storage", "Collaboration"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/nextcloud/server/master/core/img/logo/logo.svg",
+      "image": "nextcloud:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8089:80"],
+      "volumes": [{ "container": "/var/www/html", "bind": "/opt/cmx/nextcloud/html" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Paperless-ngx",
+      "description": "Dokumenten-Management (Scan → OCR → Archiv). Für Produktion DB/Redis empfohlen.",
+      "categories": ["CMX Modules", "Docs"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/paperless-ngx/paperless-ngx/main/resources/logo/web/png/Black%20text%20on%20white%20background.png",
+      "image": "ghcr.io/paperless-ngx/paperless-ngx:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8010:8000"],
+      "volumes": [
+        { "container": "/usr/src/paperless/data", "bind": "/opt/cmx/paperless/data" },
+        { "container": "/usr/src/paperless/media", "bind": "/opt/cmx/paperless/media" },
+        { "container": "/usr/src/paperless/consume", "bind": "/opt/cmx/paperless/consume" }
+      ]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Meilisearch",
+      "description": "Ultra schnelle Search Engine (Module: Suche über Assets/Docs/CRM etc.).",
+      "categories": ["CMX Core", "Search"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/meilisearch/meilisearch/main/assets/logo.svg",
+      "image": "getmeili/meilisearch:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["7700:7700"],
+      "env": [
+        { "name": "MEILI_MASTER_KEY", "label": "Master Key", "default": "CHANGE_ME_LONG_RANDOM_SECRET" }
+      ],
+      "volumes": [{ "container": "/meili_data", "bind": "/opt/cmx/meili/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Qdrant (Vector DB)",
+      "description": "Vector Database für AI Search / RAG / Embeddings.",
+      "categories": ["CMX AI", "VectorDB"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/qdrant/qdrant/master/docs/static/img/logo_with_text.svg",
+      "image": "qdrant/qdrant:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["6333:6333"],
+      "volumes": [{ "container": "/qdrant/storage", "bind": "/opt/cmx/qdrant/storage" }]
+    },
+
+    {
+      "type": 1,
       "title": "CMX - Ollama (Local LLM Runtime)",
       "description": "Lokale LLM Runtime (für CMax AI / private Modelle).",
       "categories": ["CMX AI", "AI Core"],
@@ -127,9 +400,7 @@
       "image": "ollama/ollama:latest",
       "restart_policy": "unless-stopped",
       "ports": ["11434:11434"],
-      "volumes": [
-        { "container": "/root/.ollama", "bind": "/opt/cmx/ollama/data" }
-      ]
+      "volumes": [{ "container": "/root/.ollama", "bind": "/opt/cmx/ollama/data" }]
     },
     {
       "type": 1,
@@ -144,9 +415,156 @@
       "env": [
         { "name": "OLLAMA_BASE_URL", "label": "Ollama URL", "default": "http://host.docker.internal:11434" }
       ],
+      "volumes": [{ "container": "/app/backend/data", "bind": "/opt/cmx/openwebui/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Flowise (AI Flows/Agents)",
+      "description": "AI Flow Builder (Agents, Tools, RAG).",
+      "categories": ["CMX AI", "AI Builder"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/FlowiseAI/Flowise/main/packages/ui/public/favicon.ico",
+      "image": "flowiseai/flowise:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3003:3000"],
+      "env": [
+        { "name": "PORT", "label": "Port", "default": "3000" }
+      ],
+      "volumes": [{ "container": "/root/.flowise", "bind": "/opt/cmx/flowise/data" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Langfuse (AI Observability)",
+      "description": "Tracing/Telemetry für AI Apps (Prompts, Tokens, Costs). Hinweis: Für Produktion DB/Redis nötig.",
+      "categories": ["CMX AI", "Observability"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/langfuse/langfuse/main/web/public/favicon.ico",
+      "image": "langfuse/langfuse:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3004:3000"]
+    },
+    {
+      "type": 1,
+      "title": "CMX - LiteLLM (LLM Proxy)",
+      "description": "LLM Proxy (Routing, Keys, Limits). Super für CMax AI Multi-Provider.",
+      "categories": ["CMX AI", "AI Core"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/BerriAI/litellm/main/docs/my-website/static/img/logo.png",
+      "image": "ghcr.io/berriai/litellm:main",
+      "restart_policy": "unless-stopped",
+      "ports": ["4000:4000"]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - code-server (VS Code im Browser)",
+      "description": "Dev Studio Basis / Remote Coding.",
+      "categories": ["CMX Dev", "IDE"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/coder/code-server/main/src/browser/media/favicon.png",
+      "image": "codercom/code-server:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8443:8080"],
+      "env": [
+        { "name": "PASSWORD", "label": "Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [{ "container": "/home/coder/project", "bind": "/opt/cmx/code-server/project" }]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Gitea (Git Server)",
+      "description": "Leichter Git Server (Repos für CMX Modules/Apps).",
+      "categories": ["CMX Dev", "Git"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/go-gitea/gitea/main/public/assets/img/logo.svg",
+      "image": "gitea/gitea:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3005:3000", "2222:22"],
       "volumes": [
-        { "container": "/app/backend/data", "bind": "/opt/cmx/openwebui/data" }
+        { "container": "/data", "bind": "/opt/cmx/gitea/data" }
       ]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Apache Guacamole",
+      "description": "Clientless Remote Desktop Gateway (RDP/VNC/SSH im Browser).",
+      "categories": ["CMX Modules", "Legacy"],
+      "platform": "linux",
+      "logo": "https://guacamole.apache.org/images/logos/guacamole-logo.png",
+      "image": "guacamole/guacamole:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8085:8080"]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Metabase (BI/Analytics)",
+      "description": "BI Tool (Dashboards auf Postgres, etc.).",
+      "categories": ["CMX Modules", "Analytics"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/metabase/metabase/master/docs/images/logo.svg",
+      "image": "metabase/metabase:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3006:3000"]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Umami (Analytics)",
+      "description": "Lightweight Web Analytics (Alternative zu GA).",
+      "categories": ["CMX Modules", "Analytics"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/umami-software/umami/master/public/logo.png",
+      "image": "ghcr.io/umami-software/umami:postgresql-latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3007:3000"]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Mailpit (SMTP Test)",
+      "description": "SMTP Catcher für Dev/Test (Mails anschauen ohne echte Zustellung).",
+      "categories": ["CMX Dev", "Email"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/axllent/mailpit/develop/ui/assets/mailpit.svg",
+      "image": "axllent/mailpit:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8025:8025", "1025:1025"],
+      "volumes": [{ "container": "/data", "bind": "/opt/cmx/mailpit/data" }]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - Duplicati (Backups)",
+      "description": "Backup Tool (S3, FTP, SMB, etc.).",
+      "categories": ["CMX Ops", "Backup"],
+      "platform": "linux",
+      "logo": "https://www.duplicati.com/images/logo.png",
+      "image": "linuxserver/duplicati:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8200:8200"],
+      "volumes": [
+        { "container": "/config", "bind": "/opt/cmx/duplicati/config" },
+        { "container": "/backups", "bind": "/opt/cmx/duplicati/backups" },
+        { "container": "/source", "bind": "/opt/cmx" }
+      ]
+    },
+
+    {
+      "type": 1,
+      "title": "CMX - RabbitMQ",
+      "description": "Message Broker (Queues für Jobs, Events).",
+      "categories": ["CMX Core", "Messaging"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/rabbitmq/rabbitmq-server/main/deps/rabbitmq_prometheus/docker/rabbitmq-logo.png",
+      "image": "rabbitmq:3-management",
+      "restart_policy": "unless-stopped",
+      "ports": ["5672:5672", "15672:15672"],
+      "env": [
+        { "name": "RABBITMQ_DEFAULT_USER", "label": "User", "default": "cmx" },
+        { "name": "RABBITMQ_DEFAULT_PASS", "label": "Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [{ "container": "/var/lib/rabbitmq", "bind": "/opt/cmx/rabbitmq/data" }]
     }
   ]
 }
