@@ -1,0 +1,152 @@
+{
+  "version": "3",
+  "templates": [
+    {
+      "type": 1,
+      "title": "CMX - PostgreSQL",
+      "description": "PostgreSQL Datenbank (Basis für CMX OS Module, ERP/CRM, Keycloak etc.)",
+      "categories": ["CMX Core", "Database"],
+      "platform": "linux",
+      "logo": "https://www.postgresql.org/media/img/about/press/elephant.png",
+      "image": "postgres:16",
+      "restart_policy": "unless-stopped",
+      "ports": ["5432:5432"],
+      "env": [
+        { "name": "POSTGRES_DB", "label": "DB Name", "default": "cmx" },
+        { "name": "POSTGRES_USER", "label": "DB User", "default": "cmx" },
+        { "name": "POSTGRES_PASSWORD", "label": "DB Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [
+        { "container": "/var/lib/postgresql/data", "bind": "/opt/cmx/postgres/data" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Redis",
+      "description": "Redis Cache/Queue (Sessions, Rate-Limits, Jobs).",
+      "categories": ["CMX Core", "Cache"],
+      "platform": "linux",
+      "logo": "https://redis.io/wp-content/uploads/2024/04/redis-logo.png",
+      "image": "redis:7-alpine",
+      "restart_policy": "unless-stopped",
+      "ports": ["6379:6379"],
+      "command": "redis-server --appendonly yes",
+      "volumes": [
+        { "container": "/data", "bind": "/opt/cmx/redis/data" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - MinIO (S3 Storage)",
+      "description": "S3-kompatibler Object Storage für Assets, Uploads, Backups.",
+      "categories": ["CMX Core", "Storage"],
+      "platform": "linux",
+      "logo": "https://min.io/resources/img/logo/MINIO_wordmark.png",
+      "image": "minio/minio:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["9000:9000", "9001:9001"],
+      "command": "server /data --console-address :9001",
+      "env": [
+        { "name": "MINIO_ROOT_USER", "label": "MinIO Root User", "default": "cmxadmin" },
+        { "name": "MINIO_ROOT_PASSWORD", "label": "MinIO Root Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [
+        { "container": "/data", "bind": "/opt/cmx/minio/data" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - n8n Automation",
+      "description": "Automation/Workflows für CMX OS (Events, Webhooks, Integrationen).",
+      "categories": ["CMX Modules", "Automation"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/n8n-io/n8n/master/assets/n8n-logo.png",
+      "image": "n8nio/n8n:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["5678:5678"],
+      "env": [
+        { "name": "N8N_HOST", "label": "Public Hostname (optional)", "default": "localhost" },
+        { "name": "N8N_PORT", "label": "Port", "default": "5678" },
+        { "name": "N8N_PROTOCOL", "label": "Protocol (http/https)", "default": "http" },
+        { "name": "WEBHOOK_URL", "label": "Webhook Base URL (optional)", "default": "http://localhost:5678" },
+        { "name": "N8N_ENCRYPTION_KEY", "label": "Encryption Key (32+ chars)", "default": "REPLACE_WITH_32PLUS_RANDOM_CHARS" },
+        { "name": "N8N_BASIC_AUTH_ACTIVE", "label": "Basic Auth aktiv", "default": "true" },
+        { "name": "N8N_BASIC_AUTH_USER", "label": "Basic Auth User", "default": "admin" },
+        { "name": "N8N_BASIC_AUTH_PASSWORD", "label": "Basic Auth Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [
+        { "container": "/home/node/.n8n", "bind": "/opt/cmx/n8n/data" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Keycloak (SSO/IAM)",
+      "description": "Identity & Access Management (SSO, Roles, Groups) – perfekt für Workspaces.",
+      "categories": ["CMX Core", "Auth"],
+      "platform": "linux",
+      "logo": "https://www.keycloak.org/resources/images/keycloak_logo_200px.svg",
+      "image": "quay.io/keycloak/keycloak:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8081:8080"],
+      "command": "start-dev",
+      "env": [
+        { "name": "KC_HOSTNAME_STRICT", "label": "Hostname strict", "default": "false" },
+        { "name": "KEYCLOAK_ADMIN", "label": "Admin User", "default": "admin" },
+        { "name": "KEYCLOAK_ADMIN_PASSWORD", "label": "Admin Password", "default": "CHANGE_ME_STRONG_PASSWORD" }
+      ],
+      "volumes": [
+        { "container": "/opt/keycloak/data", "bind": "/opt/cmx/keycloak/data" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - OnlyOffice Document Server",
+      "description": "Office Suite Backend (Docs/Sheets/Slides) – als CMX Office-Modul nutzbar.",
+      "categories": ["CMX Modules", "Office"],
+      "platform": "linux",
+      "logo": "https://www.onlyoffice.com/images/logo/logo_onlyoffice.svg",
+      "image": "onlyoffice/documentserver:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["8082:80"],
+      "env": [
+        { "name": "JWT_ENABLED", "label": "JWT aktivieren", "default": "true" },
+        { "name": "JWT_SECRET", "label": "JWT Secret", "default": "CHANGE_ME_LONG_RANDOM_SECRET" }
+      ],
+      "volumes": [
+        { "container": "/var/www/onlyoffice/Data", "bind": "/opt/cmx/onlyoffice/data" },
+        { "container": "/var/log/onlyoffice", "bind": "/opt/cmx/onlyoffice/logs" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Ollama (Local LLM Runtime)",
+      "description": "Lokale LLM Runtime (für CMax AI / private Modelle).",
+      "categories": ["CMX AI", "AI Core"],
+      "platform": "linux",
+      "logo": "https://ollama.com/public/ollama.png",
+      "image": "ollama/ollama:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["11434:11434"],
+      "volumes": [
+        { "container": "/root/.ollama", "bind": "/opt/cmx/ollama/data" }
+      ]
+    },
+    {
+      "type": 1,
+      "title": "CMX - Open WebUI (Chat UI for Ollama)",
+      "description": "Web UI für Ollama – kann als CMax-Interface / Admin-Chat dienen.",
+      "categories": ["CMX AI", "AI UI"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/open-webui/open-webui/main/static/logo.png",
+      "image": "ghcr.io/open-webui/open-webui:latest",
+      "restart_policy": "unless-stopped",
+      "ports": ["3000:8080"],
+      "env": [
+        { "name": "OLLAMA_BASE_URL", "label": "Ollama URL", "default": "http://host.docker.internal:11434" }
+      ],
+      "volumes": [
+        { "container": "/app/backend/data", "bind": "/opt/cmx/openwebui/data" }
+      ]
+    }
+  ]
+}
